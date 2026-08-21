@@ -35,6 +35,7 @@ export interface Domaine {
 export interface Parcelle {
   id: string;
   code: string;             // PARC001
+  name?: string;            // libellé local optionnel (non synchronisé)
   ownerName: string;
   ownerPhone?: string;
   domaineId: string;
