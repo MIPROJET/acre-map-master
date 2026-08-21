@@ -29,7 +29,7 @@ function mapDomaine(row: Domaine, userId: string | null) {
   };
 }
 function mapParcelle(row: Parcelle, userId: string | null) {
-  return {
+  const base = {
     id: row.id, code: row.code, owner_name: row.ownerName,
     owner_phone: row.ownerPhone ?? null, domaine_id: row.domaineId,
     convention_date: toIso(row.conventionDate), declared_area: row.declaredArea ?? null,
@@ -39,6 +39,8 @@ function mapParcelle(row: Parcelle, userId: string | null) {
     notes: row.notes ?? null, created_by: userId,
     created_at: toIso(row.createdAt) ?? new Date().toISOString(),
   };
+  // `name` existe après l'exécution manuelle du SQL (colonne ajoutée à public.parcelles).
+  return { ...base, name: row.name ?? null } as typeof base;
 }
 function mapMeasurement(row: Measurement, userId: string | null) {
   return {
@@ -215,7 +217,8 @@ export async function pullFromCloud(): Promise<PullResult> {
   const parcRes = await supabase.from("parcelles").select("*").limit(1000);
   if (parcRes.data) {
     const rows: Parcelle[] = parcRes.data.map((r) => ({
-      id: r.id, code: r.code, ownerName: r.owner_name ?? "", ownerPhone: r.owner_phone ?? undefined,
+      id: r.id, code: r.code, name: (r as { name?: string | null }).name ?? undefined,
+      ownerName: r.owner_name ?? "", ownerPhone: r.owner_phone ?? undefined,
       domaineId: r.domaine_id, conventionDate: ts(r.convention_date),
       declaredArea: r.declared_area ?? undefined,
       conventionStatus: (r.convention_status ?? "EN_COURS") as Parcelle["conventionStatus"],

@@ -1,71 +1,161 @@
+# SQL manuel — AcreMap (à exécuter dans Supabase SQL Editor)
 
-# Plan — AcreMap V1 Production : migration cloud + modules restants
+Ce script est idempotent : il peut être relancé sans risque.
+Il ajoute la colonne `name` sur `parcelles`, complète les tables manquantes,
+les index, les grants, les RLS et les politiques de stockage.
 
-Le cahier des charges est largement couvert (mesure GPS, morcellement strict 1 ha, PDF entreprise/client, exports DXF/KML/SHP/GeoJSON, validation, hiérarchie SP/Domaine/Parcelle). Restent 4 chantiers majeurs pour atteindre la version production. Je propose de les faire dans cet ordre car chacun débloque le suivant.
+## 1. Colonne `name` sur les parcelles
 
-## Chantier 1 — Supabase = source de vérité, IndexedDB = cache offline
+```sql
+alter table public.parcelles add column if not exists name text;
+comment on column public.parcelles.name is 'Nom libre de la parcelle (saisi à l''étape Parcelle)';
+```
 
-C'est le plus important. Aujourd'hui toutes les données vivent dans le navigateur (IndexedDB). En production : un agent perd son téléphone = données perdues, et le superviseur ne voit rien.
+## 2. Colonnes complémentaires sur les imports
 
-**Cible :**
-- Supabase devient la base principale (tables `sps`, `domaines`, `parcelles`, `measurements`, `lots`, `voies`, `partages` déjà présentes).
-- IndexedDB ne sert plus que de cache offline + file d'attente d'écritures (outbox pattern).
-- Toute écriture : 1) écrit dans IndexedDB + marque `pendingSync=true`, 2) si online, pousse vers Supabase et démarque, 3) si offline, retentera à la reconnexion.
-- Toute lecture : tente Supabase en premier ; si offline, tombe sur IndexedDB.
-- Sauvegarde locale toutes les 30 s en cours de mesure (§10.2 du cahier des charges).
+```sql
+alter table public.imports add column if not exists parsed jsonb;
+alter table public.imports add column if not exists storage_path text;
+alter table public.imports add column if not exists error text;
+```
 
-**Implémentation :**
-- Nouveau `src/lib/repo/*` — un fichier par entité (`parcelles.ts`, `measurements.ts`, …) avec API unique `list/get/upsert/remove` qui orchestre Supabase + Dexie.
-- Hook `useOnlineStatus` + `src/lib/sync.ts` — vide la file d'attente quand `navigator.onLine` repasse à true (event `online`).
-- Migration des données existantes : bouton "Importer mes mesures locales vers le cloud" sur `/app/debug` (ne touche pas aux IDs).
+## 3. Index utiles
 
-**Schéma Supabase** : audit + ajout des colonnes manquantes (`owner_photo`, `group_photo`, `parcelle_photo` pour stockage base64 ou bucket, `device_profile`, `qa` JSON pour mesures, `bornes`, `is_reserve` pour lots). Migration unique.
+```sql
+create unique index if not exists sps_code_key        on public.sps (code);
+create unique index if not exists domaines_code_key   on public.domaines (code);
+create unique index if not exists parcelles_code_key  on public.parcelles (code);
+create index if not exists domaines_sp_idx           on public.domaines (sp_id);
+create index if not exists parcelles_domaine_idx     on public.parcelles (domaine_id);
+create index if not exists measurements_parcelle_idx on public.measurements (parcelle_id);
+create index if not exists lots_parcelle_idx         on public.lots (parcelle_id);
+create index if not exists imports_parcelle_idx      on public.imports (parcelle_id);
+create index if not exists imports_created_idx       on public.imports (created_at desc);
+```
 
-## Chantier 2 — Gestion utilisateurs (Module §9)
+## 4. Table des photos liées (propriétaire, famille, parcelle)
 
-**Cible :** seul l'admin crée des comptes ; nouveau compte = mot de passe temporaire ; à la 1ère connexion, l'utilisateur DOIT changer son mot de passe.
+```sql
+create table if not exists public.parcelle_photos (
+  id uuid primary key default gen_random_uuid(),
+  parcelle_id uuid not null references public.parcelles(id) on delete cascade,
+  kind text not null default 'parcelle',   -- 'owner' | 'group' | 'parcelle'
+  storage_path text not null,
+  caption text,
+  created_by uuid references auth.users(id),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
 
-**Implémentation :**
-- Server fn `createUserAccount` (admin only, via `requireSupabaseAuth` + `has_role('admin')`, utilise `supabaseAdmin.auth.admin.createUser`) — renvoie identifiant + mot de passe temporaire en clair (affiché 1 fois).
-- Champ `profiles.must_change_password` (booléen, défaut `true` à la création admin).
-- Au login : si `must_change_password=true`, redirige vers `/app/change-password` avant tout accès.
-- Refonte `src/routes/app.users.tsx` : liste, création, désactivation, attribution de rôle (`admin`/`agent`/`viewer`).
-- `src/routes/login.tsx` : retirer toute trace d'inscription publique ; design conforme §2.1 (logo + tagline + form).
+grant select, insert, update, delete on public.parcelle_photos to authenticated;
+grant all on public.parcelle_photos to service_role;
 
-## Chantier 3 — Cartographie satellite ↔ schématique (Module §7)
+alter table public.parcelle_photos enable row level security;
 
-**Cible :** chaque vue (liste parcelles, détail parcelle, hiérarchie) propose le toggle.
-- `src/components/MapView.tsx` : ajouter prop `mode: "satellite" | "schematic"` + bouton flottant de bascule.
-  - Satellite : tile ESRI World Imagery (déjà la base).
-  - Schématique : fond uni clair + polygones colorés, voies, étiquettes lots — pas de tuiles.
-- Vue par niveau hiérarchique : `/app/hierarchie` affiche tous les domaines d'une SP, ou toutes les parcelles d'un domaine, sur une seule carte.
+drop policy if exists parcelle_photos_select on public.parcelle_photos;
+create policy parcelle_photos_select on public.parcelle_photos for select to authenticated
+  using (has_role(auth.uid(),'admin') or has_role(auth.uid(),'agent') or has_role(auth.uid(),'viewer'));
 
-## Chantier 4 — Exports PNG + niveaux hiérarchiques (Module §8)
+drop policy if exists parcelle_photos_write on public.parcelle_photos;
+create policy parcelle_photos_write on public.parcelle_photos for insert to authenticated
+  with check (has_role(auth.uid(),'admin') or has_role(auth.uid(),'agent'));
 
-**Cible :**
-- Export PNG haute résolution (jsPDF + `html2canvas` ou rendu canvas direct) en plus du PDF, pour chaque niveau.
-- Boutons d'export sur SP / Domaine / Parcelle / Lot (pas seulement parcelle).
-- Format A4 + A3 + A2 sélectionnable.
+drop policy if exists parcelle_photos_update on public.parcelle_photos;
+create policy parcelle_photos_update on public.parcelle_photos for update to authenticated
+  using (has_role(auth.uid(),'admin') or has_role(auth.uid(),'agent'))
+  with check (has_role(auth.uid(),'admin') or has_role(auth.uid(),'agent'));
 
-**Implémentation :**
-- Refactor `src/lib/pdf.ts` → `src/lib/render/` avec fonctions partagées (entête, légende, plan 2D) consommables par PDF et PNG.
-- Boutons "PNG" à côté des boutons PDF existants.
+drop policy if exists parcelle_photos_delete on public.parcelle_photos;
+create policy parcelle_photos_delete on public.parcelle_photos for delete to authenticated
+  using (has_role(auth.uid(),'admin'));
 
-## Ordre d'exécution proposé
+drop trigger if exists set_updated_at_parcelle_photos on public.parcelle_photos;
+create trigger set_updated_at_parcelle_photos before update on public.parcelle_photos
+  for each row execute function public.set_updated_at();
+```
 
-1. **Chantier 1** — fondations cloud (1 migration SQL + repo + sync).
-2. **Chantier 2** — gestion utilisateurs (bloque la mise en production sans).
-3. **Chantier 3** — toggle satellite/schématique (rapide, valeur visuelle).
-4. **Chantier 4** — PNG + niveaux d'export (le plus volumineux mais le moins bloquant).
+## 5. Affectation d'une parcelle à un utilisateur (suivi terrain)
 
-Chaque chantier sera livré avec ses propres tests visuels (preview).
+```sql
+create table if not exists public.parcelle_assignments (
+  id uuid primary key default gen_random_uuid(),
+  parcelle_id uuid not null references public.parcelles(id) on delete cascade,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  role_label text not null default 'agent',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (parcelle_id, user_id)
+);
 
-## Notes techniques
+grant select, insert, update, delete on public.parcelle_assignments to authenticated;
+grant all on public.parcelle_assignments to service_role;
 
-- **PWA offline** : la PWA est déjà présente (`public/sw.js`, `manifest.webmanifest`). Pas de refonte ; juste ajout du listener `online`/`offline` + outbox.
-- **Photos** : stockage actuel en base64 dans IndexedDB. Migration vers bucket Supabase Storage `parcelle-photos` (privé, RLS par owner).
-- **Pas de changement** côté mesure GPS, morcellement, PDF déjà fonctionnels.
+alter table public.parcelle_assignments enable row level security;
 
-## Demande de validation
+drop policy if exists pa_select on public.parcelle_assignments;
+create policy pa_select on public.parcelle_assignments for select to authenticated
+  using (user_id = auth.uid() or has_role(auth.uid(),'admin') or has_role(auth.uid(),'agent'));
 
-Ce plan représente ~1500-2000 lignes de code modifiées/ajoutées et 1 migration SQL non-triviale. Veux-tu que je l'exécute intégralement dans la foulée, ou préfères-tu valider chantier par chantier (je m'arrête à la fin de chaque chantier pour que tu testes) ?
+drop policy if exists pa_write on public.parcelle_assignments;
+create policy pa_write on public.parcelle_assignments for all to authenticated
+  using (has_role(auth.uid(),'admin'))
+  with check (has_role(auth.uid(),'admin'));
+
+drop trigger if exists set_updated_at_parcelle_assignments on public.parcelle_assignments;
+create trigger set_updated_at_parcelle_assignments before update on public.parcelle_assignments
+  for each row execute function public.set_updated_at();
+```
+
+## 6. Politiques de stockage (buckets `imports` et `photos`)
+
+Les buckets existent déjà et sont privés. Les politiques ci-dessous autorisent
+les utilisateurs authentifiés disposant d'un rôle à lire/écrire.
+
+```sql
+drop policy if exists storage_imports_read on storage.objects;
+create policy storage_imports_read on storage.objects for select to authenticated
+  using (bucket_id = 'imports'
+     and (has_role(auth.uid(),'admin') or has_role(auth.uid(),'agent') or has_role(auth.uid(),'viewer')));
+
+drop policy if exists storage_imports_write on storage.objects;
+create policy storage_imports_write on storage.objects for insert to authenticated
+  with check (bucket_id = 'imports' and (has_role(auth.uid(),'admin') or has_role(auth.uid(),'agent')));
+
+drop policy if exists storage_imports_update on storage.objects;
+create policy storage_imports_update on storage.objects for update to authenticated
+  using (bucket_id = 'imports' and (has_role(auth.uid(),'admin') or has_role(auth.uid(),'agent')))
+  with check (bucket_id = 'imports' and (has_role(auth.uid(),'admin') or has_role(auth.uid(),'agent')));
+
+drop policy if exists storage_imports_delete on storage.objects;
+create policy storage_imports_delete on storage.objects for delete to authenticated
+  using (bucket_id = 'imports' and has_role(auth.uid(),'admin'));
+
+drop policy if exists storage_photos_read on storage.objects;
+create policy storage_photos_read on storage.objects for select to authenticated
+  using (bucket_id = 'photos'
+     and (has_role(auth.uid(),'admin') or has_role(auth.uid(),'agent') or has_role(auth.uid(),'viewer')));
+
+drop policy if exists storage_photos_write on storage.objects;
+create policy storage_photos_write on storage.objects for insert to authenticated
+  with check (bucket_id = 'photos' and (has_role(auth.uid(),'admin') or has_role(auth.uid(),'agent')));
+
+drop policy if exists storage_photos_update on storage.objects;
+create policy storage_photos_update on storage.objects for update to authenticated
+  using (bucket_id = 'photos' and (has_role(auth.uid(),'admin') or has_role(auth.uid(),'agent')))
+  with check (bucket_id = 'photos' and (has_role(auth.uid(),'admin') or has_role(auth.uid(),'agent')));
+
+drop policy if exists storage_photos_delete on storage.objects;
+create policy storage_photos_delete on storage.objects for delete to authenticated
+  using (bucket_id = 'photos' and has_role(auth.uid(),'admin'));
+```
+
+## 7. Rappel manuel (hors SQL)
+
+Dans le dashboard Supabase : **Authentication → Providers → Email** →
+activer « Prevent use of leaked passwords » (protection contre les mots de passe compromis).
+
+## Après exécution
+
+Aucune action supplémentaire dans l'application : le code lit et écrit déjà
+`parcelles.name`, `imports.storage_path` et le bucket `imports` (bouton
+« Traiter » de la page Traitement & morcellement).
