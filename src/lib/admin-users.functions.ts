@@ -94,6 +94,11 @@ export const toggleUserDisabledAdmin = createServerFn({ method: "POST" })
     await assertAdmin(context.supabase, context.userId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     await supabaseAdmin.from("profiles").update({ disabled: data.disabled }).eq("id", data.userId);
+    // Revoke/restore the Supabase Auth account itself so existing tokens stop working.
+    const { error } = await supabaseAdmin.auth.admin.updateUserById(data.userId, {
+      ban_duration: data.disabled ? "876000h" : "none",
+    });
+    if (error) throw new Error("Impossible de mettre à jour le compte");
     return { ok: true };
   });
 
