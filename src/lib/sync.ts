@@ -217,7 +217,8 @@ export async function pullFromCloud(): Promise<PullResult> {
   const parcRes = await supabase.from("parcelles").select("*").limit(1000);
   if (parcRes.data) {
     const rows: Parcelle[] = parcRes.data.map((r) => ({
-      id: r.id, code: r.code, ownerName: r.owner_name ?? "", ownerPhone: r.owner_phone ?? undefined,
+      id: r.id, code: r.code, name: (r as { name?: string | null }).name ?? undefined,
+      ownerName: r.owner_name ?? "", ownerPhone: r.owner_phone ?? undefined,
       domaineId: r.domaine_id, conventionDate: ts(r.convention_date),
       declaredArea: r.declared_area ?? undefined,
       conventionStatus: (r.convention_status ?? "EN_COURS") as Parcelle["conventionStatus"],
