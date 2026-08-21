@@ -578,9 +578,6 @@ function MeasurePage() {
               mais <strong>aucun tracé n'est enregistré</strong>. Placez-vous ensuite au point de
               départ et appuyez sur « MARQUER LE DÉPART » pour lancer réellement la levée.
             </p>
-            <div className="text-xs text-warn bg-warn/10 rounded-md p-2 mt-3">
-              Bornage légal réalisé par un géomètre assermenté.
-            </div>
             <button
               onClick={openSurvey}
               className="mt-5 w-full h-14 bg-primary text-primary-foreground rounded-xl font-bold text-base shadow-elevated"
