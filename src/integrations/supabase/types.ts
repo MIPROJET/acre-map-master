@@ -239,6 +239,82 @@ export type Database = {
           },
         ]
       }
+      parcelle_assignments: {
+        Row: {
+          created_at: string
+          id: string
+          parcelle_id: string
+          role_label: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          parcelle_id: string
+          role_label?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          parcelle_id?: string
+          role_label?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "parcelle_assignments_parcelle_id_fkey"
+            columns: ["parcelle_id"]
+            isOneToOne: false
+            referencedRelation: "parcelles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      parcelle_photos: {
+        Row: {
+          caption: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          kind: string
+          parcelle_id: string
+          storage_path: string
+          updated_at: string
+        }
+        Insert: {
+          caption?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          kind?: string
+          parcelle_id: string
+          storage_path: string
+          updated_at?: string
+        }
+        Update: {
+          caption?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          kind?: string
+          parcelle_id?: string
+          storage_path?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "parcelle_photos_parcelle_id_fkey"
+            columns: ["parcelle_id"]
+            isOneToOne: false
+            referencedRelation: "parcelles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       parcelles: {
         Row: {
           code: string
@@ -250,6 +326,7 @@ export type Database = {
           domaine_id: string
           group_photo: string | null
           id: string
+          name: string | null
           notes: string | null
           owner_name: string
           owner_phone: string | null
@@ -267,6 +344,7 @@ export type Database = {
           domaine_id: string
           group_photo?: string | null
           id?: string
+          name?: string | null
           notes?: string | null
           owner_name?: string
           owner_phone?: string | null
@@ -284,6 +362,7 @@ export type Database = {
           domaine_id?: string
           group_photo?: string | null
           id?: string
+          name?: string | null
           notes?: string | null
           owner_name?: string
           owner_phone?: string | null
