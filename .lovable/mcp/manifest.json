@@ -1,0 +1,143 @@
+{
+  "version": 1,
+  "sdk_version": "0.26.2",
+  "path": "/mcp",
+  "auth": {
+    "type": "oauth",
+    "issuer": "https://nrrgqnruoylwztddkntm.supabase.co/auth/v1",
+    "accepted_audiences": [
+      "authenticated"
+    ]
+  },
+  "mcp": {
+    "server": {
+      "name": "acremap",
+      "version": "0.1.0",
+      "title": "AcreMap"
+    },
+    "tools": [
+      {
+        "name": "list_parcelles",
+        "title": "Lister les parcelles",
+        "description": "Liste les parcelles accessibles à l'utilisateur connecté (code, propriétaire, domaine, statut de convention).",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "search": {
+              "type": "string",
+              "description": "Filtre sur le code ou le nom du propriétaire."
+            },
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50,
+              "description": "Nombre maximum de parcelles."
+            }
+          },
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "get_parcelle",
+        "title": "Détail d'une parcelle",
+        "description": "Retourne une parcelle avec ses levés GPS (surface, périmètre, qualité) et ses lots de morcellement.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "parcelle_id": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Identifiant de la parcelle."
+            },
+            "code": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Code de la parcelle, ex. PARC001."
+            }
+          },
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "list_lots",
+        "title": "Lister les lots de morcellement",
+        "description": "Liste les lots issus du morcellement (code, superficie, réserve, attributaire), filtrables par parcelle.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "parcelle_id": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Ne retourner que les lots de cette parcelle."
+            },
+            "only_reserve": {
+              "type": "boolean",
+              "default": false,
+              "description": "Ne retourner que les lots marqués comme réserve."
+            },
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 500,
+              "default": 100,
+              "description": "Nombre maximum de lots."
+            }
+          },
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "list_hierarchie",
+        "title": "Lister la hiérarchie géographique",
+        "description": "Liste les sous-préfectures (SP) et les domaines : district, région, département, codes et rattachements.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "sp_id": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Ne retourner que les domaines de cette SP."
+            },
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 100,
+              "description": "Nombre maximum d'éléments par niveau."
+            }
+          },
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      }
+    ]
+  }
+}
