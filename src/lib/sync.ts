@@ -267,13 +267,71 @@ export async function pullFromCloud(): Promise<PullResult> {
   return { total, perTable };
 }
 
-// ---- Auto-flush on reconnect ----
+// ---- Suppression synchronisée (locale déjà faite par l'appelant) ----
+export async function syncDelete(table: TableName, id: string): Promise<void> {
+  if (!isBrowser()) return;
+  if (navigator.onLine) {
+    try { await pushDelete(table, id); return; }
+    catch { await enqueue(table, "delete", id); return; }
+  }
+  await enqueue(table, "delete", id);
+}
+
+/** Push best-effort, jamais bloquant pour l'UI (échec ⇒ file d'attente). */
+export function syncNow(table: TableName, id: string): void {
+  void syncEntity(table, id).catch(() => {});
+}
+export function syncRemoved(table: TableName, id: string): void {
+  void syncDelete(table, id).catch(() => {});
+}
+
+/** Vide toutes les files d'attente puis rafraîchit le cache local depuis le cloud. */
+export async function syncAll(): Promise<{ flushed: number; failed: number; pulled: number }> {
+  if (!isBrowser() || !navigator.onLine) return { flushed: 0, failed: 0, pulled: 0 };
+  const { ok, failed } = await flushOutbox();
+  let pulled = 0;
+  try { pulled = (await pullFromCloud()).total; } catch { /* cache conservé */ }
+  return { flushed: ok, failed, pulled };
+}
+
+/** Migration unique par appareil : pousse l'historique local encore absent du cloud. */
+const META_MIGRATED = "sync.migratedAt";
+export async function ensureInitialMigration(): Promise<void> {
+  if (!isBrowser() || !navigator.onLine) return;
+  const local = db();
+  const flag = await local.meta.get(META_MIGRATED);
+  if (flag?.value) return;
+  const counts = await Promise.all([
+    local.sps.count(), local.domaines.count(), local.parcelles.count(),
+    local.measurements.count(), local.lots.count(),
+  ]);
+  if (counts.reduce((a, b) => a + b, 0) === 0) {
+    await local.meta.put({ key: META_MIGRATED, value: Date.now() });
+    return;
+  }
+  try {
+    await migrateLocalToCloud(() => {});
+    await local.meta.put({ key: META_MIGRATED, value: Date.now() });
+  } catch { /* réessai au prochain démarrage */ }
+}
+
+// ---- Auto-flush : reconnexion, retour au premier plan, périodique ----
 let _initialized = false;
+let _running = false;
 export function initSync() {
   if (!isBrowser() || _initialized) return;
   _initialized = true;
-  const handler = () => { void flushOutbox(); };
-  window.addEventListener("online", handler);
-  // also flush on first mount if already online and queue non-empty
-  if (navigator.onLine) setTimeout(handler, 2000);
+  const run = () => {
+    if (_running || !navigator.onLine) return;
+    _running = true;
+    void syncAll().finally(() => { _running = false; });
+  };
+  window.addEventListener("online", run);
+  window.addEventListener("focus", run);
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) run(); });
+  setInterval(run, 120_000);
+  if (navigator.onLine) {
+    setTimeout(() => { void ensureInitialMigration().finally(run); }, 1500);
+  }
 }
+
