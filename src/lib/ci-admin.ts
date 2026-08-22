@@ -11,7 +11,10 @@ export interface AdminUnit {
 
 export const CI_ADMIN: AdminUnit[] = [
   { district: "Sassandra-Marahoué", region: "Haut-Sassandra", departement: "Daloa",
-    sps: ["Daloa", "Bediala", "Gboguhe", "Gonate", "Zaibo", "Zoukougbeu"] },
+    sps: ["Daloa", "Bediala", "Gboguhe", "Gonate", "Zaibo"] },
+  // Zoukougbeu est un DÉPARTEMENT du Haut-Sassandra (et non une SP de Daloa).
+  { district: "Sassandra-Marahoué", region: "Haut-Sassandra", departement: "Zoukougbeu",
+    sps: ["Zoukougbeu", "Domangbeu", "Guessabo", "Grégbeu"] },
   { district: "Sassandra-Marahoué", region: "Haut-Sassandra", departement: "Issia",
     sps: ["Issia", "Boguedia", "Iboguhe", "Namane", "Nezobly", "Saioua", "Tapeguia"] },
   { district: "Sassandra-Marahoué", region: "Haut-Sassandra", departement: "Vavoua",

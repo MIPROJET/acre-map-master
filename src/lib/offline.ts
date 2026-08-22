@@ -4,7 +4,7 @@
 // - Suivi de l'état réseau
 import { db, isBrowser } from "./db";
 import { CI_ADMIN } from "./ci-admin";
-import { pullFromCloud } from "./sync";
+import { flushOutbox, pullFromCloud } from "./sync";
 
 export interface OfflineStatus {
   online: boolean;
@@ -38,12 +38,13 @@ export async function lastPullAt(): Promise<number | null> {
   return (row?.value as number) ?? null;
 }
 
-/** Synchronisation descendante + mise en cache des références. Silencieuse hors ligne. */
+/** Vide les files d'attente puis synchronise le cache local. Silencieuse hors ligne. */
 export async function warmOfflineCache(): Promise<{ pulled: number } | null> {
   if (!isBrowser()) return null;
   await cacheReferenceData();
   if (!navigator.onLine) return null;
   try {
+    await flushOutbox();
     const res = await pullFromCloud();
     await db().meta.put({ key: META_LAST_PULL, value: Date.now() });
     return { pulled: res.total };
@@ -51,6 +52,7 @@ export async function warmOfflineCache(): Promise<{ pulled: number } | null> {
     return null;
   }
 }
+
 
 // ---- Tuiles carto ----
 function lngToX(lng: number, z: number) { return Math.floor(((lng + 180) / 360) * 2 ** z); }
