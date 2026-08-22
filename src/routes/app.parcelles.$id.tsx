@@ -226,33 +226,43 @@ function ParcDetail() {
     }));
     await db().lots.where("measurementId").equals(m!.id).delete();
     await db().lots.bulkPut(items);
+    items.forEach((l) => syncNow("lots", l.id));
     setShowMorc(false);
   }
 
   async function deleteLots() {
     if (!confirm(`Supprimer les ${lots.length} lots créés ?`)) return;
+    const olds = await db().lots.where("measurementId").equals(m!.id).toArray();
     await db().lots.where("measurementId").equals(m!.id).delete();
+    olds.forEach((l) => syncRemoved("lots", l.id));
   }
 
   async function assignLot(lotId: string) {
     const name = prompt("Nom du souscripteur pour ce lot :");
     if (!name) return;
     await db().lots.update(lotId, { assigneeName: name, assignedAt: Date.now() });
+    syncNow("lots", lotId);
   }
 
   async function validate() {
     if (!hasRole(user, "admin")) return;
     await db().measurements.update(m!.id, { status: "validated", validatedBy: user!.id, validatedAt: Date.now() });
+    syncNow("measurements", m!.id);
   }
 
   async function remove() {
     if (!hasRole(user, "admin")) return;
     if (!confirm("Supprimer définitivement cette mesure ?")) return;
     if (!confirm("Confirmer une seconde fois — action irréversible.")) return;
+    const olds = await db().lots.where("measurementId").equals(m!.id).toArray();
     await db().lots.where("measurementId").equals(m!.id).delete();
-    await db().measurements.delete(m!.id);
+    olds.forEach((l) => syncRemoved("lots", l.id));
+    const mid = m!.id;
+    await db().measurements.delete(mid);
+    syncRemoved("measurements", mid);
     nav({ to: "/app/parcelles" });
   }
+
 
   function exportAs(kind: "geojson" | "kml" | "csv" | "dxf" | "shp") {
     const base = parc?.code ?? `mesure-${m!.id.slice(0, 6)}`;
