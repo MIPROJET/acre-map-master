@@ -5,6 +5,7 @@ import { db, isBrowser } from "@/lib/db";
 import { useAuth, hasRole } from "@/lib/auth";
 import { formatArea, formatDate } from "@/lib/format";
 import { feedbackSuccess, notify } from "@/lib/feedback";
+import { syncNow } from "@/lib/sync";
 
 export const Route = createFileRoute("/app/validation")({
   component: ValidationPage,
@@ -30,6 +31,7 @@ function ValidationPage() {
   async function validate(id: string) {
     setBusyId(id);
     await db().measurements.update(id, { status: "validated", validatedBy: user!.id, validatedAt: Date.now() });
+    syncNow("measurements", id);
     feedbackSuccess();
     await notify("Mesure validée", "La mesure a été validée et archivée.", { tag: "validated" });
     setBusyId(null);
@@ -39,8 +41,10 @@ function ValidationPage() {
     if (!confirm("Renvoyer la mesure en brouillon pour correction ?")) return;
     setBusyId(id);
     await db().measurements.update(id, { status: "draft" });
+    syncNow("measurements", id);
     setBusyId(null);
   }
+
 
   return (
     <div className="p-4 lg:p-8 max-w-5xl mx-auto space-y-4">

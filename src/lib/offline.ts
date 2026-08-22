@@ -4,7 +4,7 @@
 // - Suivi de l'état réseau
 import { db, isBrowser } from "./db";
 import { CI_ADMIN } from "./ci-admin";
-import { pullFromCloud } from "./sync";
+import { flushOutbox, pullFromCloud } from "./sync";
 
 export interface OfflineStatus {
   online: boolean;
