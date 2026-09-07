@@ -9,36 +9,31 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as McpRouteImport } from './routes/mcp'
-import { Route as LoginRouteImport } from './routes/login'
-import { Route as AppRouteImport } from './routes/app'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as AppIndexRouteImport } from './routes/app.index'
-import { Route as AppValidationRouteImport } from './routes/app.validation'
-import { Route as AppUsersRouteImport } from './routes/app.users'
-import { Route as AppTraitementRouteImport } from './routes/app.traitement'
-import { Route as AppMeasureRouteImport } from './routes/app.measure'
-import { Route as AppImportRouteImport } from './routes/app.import'
-import { Route as AppHierarchieRouteImport } from './routes/app.hierarchie'
-import { Route as AppDebugRouteImport } from './routes/app.debug'
-import { Route as AppChangePasswordRouteImport } from './routes/app.change-password'
-import { Route as AppAssistantRouteImport } from './routes/app.assistant'
-import { Route as Char91DotwellKnownChar93OauthProtectedResourceRouteImport } from './routes/[.well-known]/oauth-protected-resource'
+import { Route as AppRouteImport } from './routes/app'
+import { Route as LoginRouteImport } from './routes/login'
+import { Route as McpRouteImport } from './routes/mcp'
 import { Route as Char91DotmcpChar93ListToolsRouteImport } from './routes/[.mcp]/list-tools'
-import { Route as AppParcellesIndexRouteImport } from './routes/app.parcelles.index'
-import { Route as AppParcellesNewRouteImport } from './routes/app.parcelles.new'
-import { Route as AppParcellesIdRouteImport } from './routes/app.parcelles.$id'
-import { Route as Char91DotmcpChar93InvokeToolToolRouteImport } from './routes/[.mcp]/invoke-tool/$tool'
+import { Route as Char91DotwellKnownChar93OauthProtectedResourceRouteImport } from './routes/[.well-known]/oauth-protected-resource'
+import { Route as AppIndexRouteImport } from './routes/app.index'
+import { Route as AppAssistantRouteImport } from './routes/app.assistant'
+import { Route as AppChangePasswordRouteImport } from './routes/app.change-password'
+import { Route as AppDebugRouteImport } from './routes/app.debug'
+import { Route as AppHierarchieRouteImport } from './routes/app.hierarchie'
+import { Route as AppImportRouteImport } from './routes/app.import'
+import { Route as AppMeasureRouteImport } from './routes/app.measure'
+import { Route as AppTraitementRouteImport } from './routes/app.traitement'
+import { Route as AppUsersRouteImport } from './routes/app.users'
+import { Route as AppValidationRouteImport } from './routes/app.validation'
 import { Route as DotlovableOauthConsentRouteImport } from './routes/[.]lovable.oauth.consent'
+import { Route as Char91DotmcpChar93InvokeToolToolRouteImport } from './routes/[.mcp]/invoke-tool/$tool'
+import { Route as AppParcellesIndexRouteImport } from './routes/app.parcelles.index'
+import { Route as AppParcellesIdRouteImport } from './routes/app.parcelles.$id'
+import { Route as AppParcellesNewRouteImport } from './routes/app.parcelles.new'
 
-const McpRoute = McpRouteImport.update({
-  id: '/mcp',
-  path: '/mcp',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const LoginRoute = LoginRouteImport.update({
-  id: '/login',
-  path: '/login',
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AppRoute = AppRouteImport.update({
@@ -46,54 +41,31 @@ const AppRoute = AppRouteImport.update({
   path: '/app',
   getParentRoute: () => rootRouteImport,
 } as any)
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
+const McpRoute = McpRouteImport.update({
+  id: '/mcp',
+  path: '/mcp',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const Char91DotmcpChar93ListToolsRoute =
+  Char91DotmcpChar93ListToolsRouteImport.update({
+    id: '/.mcp/list-tools',
+    path: '/.mcp/list-tools',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const Char91DotwellKnownChar93OauthProtectedResourceRoute =
+  Char91DotwellKnownChar93OauthProtectedResourceRouteImport.update({
+    id: '/.well-known/oauth-protected-resource',
+    path: '/.well-known/oauth-protected-resource',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const AppIndexRoute = AppIndexRouteImport.update({
   id: '/',
   path: '/',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppValidationRoute = AppValidationRouteImport.update({
-  id: '/validation',
-  path: '/validation',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppUsersRoute = AppUsersRouteImport.update({
-  id: '/users',
-  path: '/users',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppTraitementRoute = AppTraitementRouteImport.update({
-  id: '/traitement',
-  path: '/traitement',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppMeasureRoute = AppMeasureRouteImport.update({
-  id: '/measure',
-  path: '/measure',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppImportRoute = AppImportRouteImport.update({
-  id: '/import',
-  path: '/import',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppHierarchieRoute = AppHierarchieRouteImport.update({
-  id: '/hierarchie',
-  path: '/hierarchie',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppDebugRoute = AppDebugRouteImport.update({
-  id: '/debug',
-  path: '/debug',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppChangePasswordRoute = AppChangePasswordRouteImport.update({
-  id: '/change-password',
-  path: '/change-password',
   getParentRoute: () => AppRoute,
 } as any)
 const AppAssistantRoute = AppAssistantRouteImport.update({
@@ -101,32 +73,50 @@ const AppAssistantRoute = AppAssistantRouteImport.update({
   path: '/assistant',
   getParentRoute: () => AppRoute,
 } as any)
-const Char91DotwellKnownChar93OauthProtectedResourceRoute =
-  Char91DotwellKnownChar93OauthProtectedResourceRouteImport.update({
-    id: '/.well-known/oauth-protected-resource',
-    path: '/.well-known/oauth-protected-resource',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const Char91DotmcpChar93ListToolsRoute =
-  Char91DotmcpChar93ListToolsRouteImport.update({
-    id: '/.mcp/list-tools',
-    path: '/.mcp/list-tools',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const AppParcellesIndexRoute = AppParcellesIndexRouteImport.update({
-  id: '/parcelles/',
-  path: '/parcelles/',
+const AppChangePasswordRoute = AppChangePasswordRouteImport.update({
+  id: '/change-password',
+  path: '/change-password',
   getParentRoute: () => AppRoute,
 } as any)
-const AppParcellesNewRoute = AppParcellesNewRouteImport.update({
-  id: '/parcelles/new',
-  path: '/parcelles/new',
+const AppDebugRoute = AppDebugRouteImport.update({
+  id: '/debug',
+  path: '/debug',
   getParentRoute: () => AppRoute,
 } as any)
-const AppParcellesIdRoute = AppParcellesIdRouteImport.update({
-  id: '/parcelles/$id',
-  path: '/parcelles/$id',
+const AppHierarchieRoute = AppHierarchieRouteImport.update({
+  id: '/hierarchie',
+  path: '/hierarchie',
   getParentRoute: () => AppRoute,
+} as any)
+const AppImportRoute = AppImportRouteImport.update({
+  id: '/import',
+  path: '/import',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppMeasureRoute = AppMeasureRouteImport.update({
+  id: '/measure',
+  path: '/measure',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppTraitementRoute = AppTraitementRouteImport.update({
+  id: '/traitement',
+  path: '/traitement',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppUsersRoute = AppUsersRouteImport.update({
+  id: '/users',
+  path: '/users',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppValidationRoute = AppValidationRouteImport.update({
+  id: '/validation',
+  path: '/validation',
+  getParentRoute: () => AppRoute,
+} as any)
+const DotlovableOauthConsentRoute = DotlovableOauthConsentRouteImport.update({
+  id: '/.lovable/oauth/consent',
+  path: '/.lovable/oauth/consent',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const Char91DotmcpChar93InvokeToolToolRoute =
   Char91DotmcpChar93InvokeToolToolRouteImport.update({
@@ -134,10 +124,20 @@ const Char91DotmcpChar93InvokeToolToolRoute =
     path: '/.mcp/invoke-tool/$tool',
     getParentRoute: () => rootRouteImport,
   } as any)
-const DotlovableOauthConsentRoute = DotlovableOauthConsentRouteImport.update({
-  id: '/.lovable/oauth/consent',
-  path: '/.lovable/oauth/consent',
-  getParentRoute: () => rootRouteImport,
+const AppParcellesIndexRoute = AppParcellesIndexRouteImport.update({
+  id: '/parcelles/',
+  path: '/parcelles/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppParcellesIdRoute = AppParcellesIdRouteImport.update({
+  id: '/parcelles/$id',
+  path: '/parcelles/$id',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppParcellesNewRoute = AppParcellesNewRouteImport.update({
+  id: '/parcelles/new',
+  path: '/parcelles/new',
+  getParentRoute: () => AppRoute,
 } as any)
 
 export interface FileRoutesByFullPath {
@@ -293,18 +293,11 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/mcp': {
-      id: '/mcp'
-      path: '/mcp'
-      fullPath: '/mcp'
-      preLoaderRoute: typeof McpRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/login': {
-      id: '/login'
-      path: '/login'
-      fullPath: '/login'
-      preLoaderRoute: typeof LoginRouteImport
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/app': {
@@ -314,88 +307,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/app/': {
-      id: '/app/'
-      path: '/'
-      fullPath: '/app/'
-      preLoaderRoute: typeof AppIndexRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/app/validation': {
-      id: '/app/validation'
-      path: '/validation'
-      fullPath: '/app/validation'
-      preLoaderRoute: typeof AppValidationRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/app/users': {
-      id: '/app/users'
-      path: '/users'
-      fullPath: '/app/users'
-      preLoaderRoute: typeof AppUsersRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/app/traitement': {
-      id: '/app/traitement'
-      path: '/traitement'
-      fullPath: '/app/traitement'
-      preLoaderRoute: typeof AppTraitementRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/app/measure': {
-      id: '/app/measure'
-      path: '/measure'
-      fullPath: '/app/measure'
-      preLoaderRoute: typeof AppMeasureRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/app/import': {
-      id: '/app/import'
-      path: '/import'
-      fullPath: '/app/import'
-      preLoaderRoute: typeof AppImportRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/app/hierarchie': {
-      id: '/app/hierarchie'
-      path: '/hierarchie'
-      fullPath: '/app/hierarchie'
-      preLoaderRoute: typeof AppHierarchieRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/app/debug': {
-      id: '/app/debug'
-      path: '/debug'
-      fullPath: '/app/debug'
-      preLoaderRoute: typeof AppDebugRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/app/change-password': {
-      id: '/app/change-password'
-      path: '/change-password'
-      fullPath: '/app/change-password'
-      preLoaderRoute: typeof AppChangePasswordRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/app/assistant': {
-      id: '/app/assistant'
-      path: '/assistant'
-      fullPath: '/app/assistant'
-      preLoaderRoute: typeof AppAssistantRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/.well-known/oauth-protected-resource': {
-      id: '/.well-known/oauth-protected-resource'
-      path: '/.well-known/oauth-protected-resource'
-      fullPath: '/.well-known/oauth-protected-resource'
-      preLoaderRoute: typeof Char91DotwellKnownChar93OauthProtectedResourceRouteImport
+    '/mcp': {
+      id: '/mcp'
+      path: '/mcp'
+      fullPath: '/mcp'
+      preLoaderRoute: typeof McpRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/.mcp/list-tools': {
@@ -405,18 +328,102 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof Char91DotmcpChar93ListToolsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/.well-known/oauth-protected-resource': {
+      id: '/.well-known/oauth-protected-resource'
+      path: '/.well-known/oauth-protected-resource'
+      fullPath: '/.well-known/oauth-protected-resource'
+      preLoaderRoute: typeof Char91DotwellKnownChar93OauthProtectedResourceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/app/': {
+      id: '/app/'
+      path: '/'
+      fullPath: '/app/'
+      preLoaderRoute: typeof AppIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/assistant': {
+      id: '/app/assistant'
+      path: '/assistant'
+      fullPath: '/app/assistant'
+      preLoaderRoute: typeof AppAssistantRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/change-password': {
+      id: '/app/change-password'
+      path: '/change-password'
+      fullPath: '/app/change-password'
+      preLoaderRoute: typeof AppChangePasswordRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/debug': {
+      id: '/app/debug'
+      path: '/debug'
+      fullPath: '/app/debug'
+      preLoaderRoute: typeof AppDebugRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/hierarchie': {
+      id: '/app/hierarchie'
+      path: '/hierarchie'
+      fullPath: '/app/hierarchie'
+      preLoaderRoute: typeof AppHierarchieRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/import': {
+      id: '/app/import'
+      path: '/import'
+      fullPath: '/app/import'
+      preLoaderRoute: typeof AppImportRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/measure': {
+      id: '/app/measure'
+      path: '/measure'
+      fullPath: '/app/measure'
+      preLoaderRoute: typeof AppMeasureRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/traitement': {
+      id: '/app/traitement'
+      path: '/traitement'
+      fullPath: '/app/traitement'
+      preLoaderRoute: typeof AppTraitementRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/users': {
+      id: '/app/users'
+      path: '/users'
+      fullPath: '/app/users'
+      preLoaderRoute: typeof AppUsersRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/validation': {
+      id: '/app/validation'
+      path: '/validation'
+      fullPath: '/app/validation'
+      preLoaderRoute: typeof AppValidationRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/.lovable/oauth/consent': {
+      id: '/.lovable/oauth/consent'
+      path: '/.lovable/oauth/consent'
+      fullPath: '/.lovable/oauth/consent'
+      preLoaderRoute: typeof DotlovableOauthConsentRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/.mcp/invoke-tool/$tool': {
+      id: '/.mcp/invoke-tool/$tool'
+      path: '/.mcp/invoke-tool/$tool'
+      fullPath: '/.mcp/invoke-tool/$tool'
+      preLoaderRoute: typeof Char91DotmcpChar93InvokeToolToolRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/app/parcelles/': {
       id: '/app/parcelles/'
       path: '/parcelles'
       fullPath: '/app/parcelles/'
       preLoaderRoute: typeof AppParcellesIndexRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/app/parcelles/new': {
-      id: '/app/parcelles/new'
-      path: '/parcelles/new'
-      fullPath: '/app/parcelles/new'
-      preLoaderRoute: typeof AppParcellesNewRouteImport
       parentRoute: typeof AppRoute
     }
     '/app/parcelles/$id': {
@@ -426,19 +433,12 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppParcellesIdRouteImport
       parentRoute: typeof AppRoute
     }
-    '/.mcp/invoke-tool/$tool': {
-      id: '/.mcp/invoke-tool/$tool'
-      path: '/.mcp/invoke-tool/$tool'
-      fullPath: '/.mcp/invoke-tool/$tool'
-      preLoaderRoute: typeof Char91DotmcpChar93InvokeToolToolRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/.lovable/oauth/consent': {
-      id: '/.lovable/oauth/consent'
-      path: '/.lovable/oauth/consent'
-      fullPath: '/.lovable/oauth/consent'
-      preLoaderRoute: typeof DotlovableOauthConsentRouteImport
-      parentRoute: typeof rootRouteImport
+    '/app/parcelles/new': {
+      id: '/app/parcelles/new'
+      path: '/parcelles/new'
+      fullPath: '/app/parcelles/new'
+      preLoaderRoute: typeof AppParcellesNewRouteImport
+      parentRoute: typeof AppRoute
     }
   }
 }
