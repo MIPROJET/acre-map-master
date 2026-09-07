@@ -16,6 +16,7 @@ import JSZip from "jszip";
 import { buildShapefileZip } from "@/lib/shp";
 import { DEFAULT_GPS_CONFIG, haversine, polygonAreaM2, polygonPerimeterM } from "@/lib/gps";
 import type { DeviceProfile, Domaine, GpsPoint, Lot, MeasurementPoint, MeasurementQA, Parcelle, SP } from "@/lib/types";
+import { syncNow, syncRemoved } from "@/lib/sync";
 import { StatusBadge } from "./app.index";
 
 export const Route = createFileRoute("/app/parcelles/$id")({
