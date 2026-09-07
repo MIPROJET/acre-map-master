@@ -17,8 +17,22 @@ async function assertAdmin(supabase: any, userId: string) {
 
 function randomPassword(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789abcdefghjkmnpqrstuvwxyz";
-  return Array.from({ length: 12 }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
+  const len = 12;
+  // CSPRNG (Web Crypto) : rejet des valeurs hors plage pour éviter tout biais modulo.
+  const out: string[] = [];
+  const limit = Math.floor(0xffffffff / chars.length) * chars.length;
+  const buf = new Uint32Array(len);
+  while (out.length < len) {
+    crypto.getRandomValues(buf);
+    for (const v of buf) {
+      if (v >= limit) continue;
+      out.push(chars[v % chars.length]!);
+      if (out.length === len) break;
+    }
+  }
+  return out.join("");
 }
+
 
 export const listUsersAdmin = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
