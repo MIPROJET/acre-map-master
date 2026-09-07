@@ -16,6 +16,7 @@ const NAV: { to: string; label: string; short: string; icon: string; admin?: boo
   { to: "/app/parcelles", label: "Parcelles & levés", short: "Parcelles", icon: "map" },
   
   { to: "/app/traitement", label: "Traitement & morcellement", short: "Traiter", icon: "tree" },
+  { to: "/app/morcellement", label: "Morcellement", short: "Morceler", icon: "grid" },
   { to: "/app/hierarchie", label: "Hiérarchie", short: "Hiérarchie", icon: "tree" },
   { to: "/app/assistant", label: "Assistant IA", short: "IA", icon: "sparkle" },
   { to: "/app/releves", label: "Relevés (historique)", short: "Relevés", icon: "check", admin: true },
@@ -183,6 +184,7 @@ function Icon({ name }: { name: string }) {
     case "map": return <svg className={common} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="2"><path d="M9 4l-6 2v14l6-2 6 2 6-2V4l-6 2-6-2zM9 4v14M15 6v14" /></svg>;
     case "tree": return <svg className={common} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="2"><path d="M5 6h4M5 12h4M5 18h4M9 6v12M13 6h6M13 12h6M13 18h6" /></svg>;
     case "check": return <svg className={common} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="2"><path d="M5 12l5 5L20 7" /></svg>;
+    case "grid": return <svg className={common} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="1" /><path d="M3 10h18M3 16h18M10 3v18" /></svg>;
     case "upload": return <svg className={common} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="2"><path d="M12 16V4M7 9l5-5 5 5M4 17v3h16v-3" /></svg>;
     case "sparkle": return <svg className={common} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="2"><path d="M12 3l1.8 4.7L18.5 9.5 13.8 11.3 12 16l-1.8-4.7L5.5 9.5l4.7-1.8z" /></svg>;
     case "users": return <svg className={common} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="2"><circle cx="9" cy="8" r="3" /><path d="M3 20c0-3 3-5 6-5s6 2 6 5M16 11a3 3 0 100-6M21 20c0-2-2-4-5-4" /></svg>;
