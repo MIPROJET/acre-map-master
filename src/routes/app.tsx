@@ -16,6 +16,7 @@ const NAV: { to: string; label: string; short: string; icon: string; admin?: boo
   { to: "/app/parcelles", label: "Parcelles & levés", short: "Parcelles", icon: "map" },
   
   { to: "/app/traitement", label: "Traitement & morcellement", short: "Traiter", icon: "tree" },
+  { to: "/app/morcellement", label: "Morcellement", short: "Morceler", icon: "grid" },
   { to: "/app/hierarchie", label: "Hiérarchie", short: "Hiérarchie", icon: "tree" },
   { to: "/app/assistant", label: "Assistant IA", short: "IA", icon: "sparkle" },
   { to: "/app/releves", label: "Relevés (historique)", short: "Relevés", icon: "check", admin: true },
