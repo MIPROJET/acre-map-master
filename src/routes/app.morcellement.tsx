@@ -35,6 +35,7 @@ interface StoredPlanPayload { cfg: MorcConfig; plan: PlanResult }
 
 function MorcellementPage() {
   const isMobile = useIsMobile();
+  const search = Route.useSearch();
 
   const [parcelles, setParcelles] = useState<Parcelle[]>([]);
   const [domaines, setDomaines] = useState<Domaine[]>([]);
@@ -102,6 +103,22 @@ function MorcellementPage() {
   useEffect(() => {
     setMeasurementId(releves[0]?.id ?? "");
   }, [parcelleId, releves.length]);
+
+  // Ouverture directe depuis « Parcelles & Mesures » (?parcelle=… ou ?measurement=…)
+  useEffect(() => {
+    if (!loaded) return;
+    if (search.parcelle && parcelles.some((p) => p.id === search.parcelle)) {
+      setParcelleId(search.parcelle);
+      return;
+    }
+    if (search.measurement) {
+      const m = measurements.find((x) => x.id === search.measurement);
+      if (m?.parcelleId) {
+        setParcelleId(m.parcelleId);
+        setMeasurementId(m.id);
+      }
+    }
+  }, [loaded, search.parcelle, search.measurement]);
 
   // --- Restauration du dernier plan enregistré pour la parcelle -------------
   useEffect(() => {
