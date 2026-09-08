@@ -97,7 +97,7 @@ function ParcellesHub() {
           const dom = parc ? data!.doms.find((x) => x.id === parc.domaineId) : null;
           const sp = dom ? data!.sps.find((x) => x.id === dom.spId) : null;
           return (
-            <Link key={m.id} to="/app/parcelles/$id" params={{ id: m.id }}
+            <Link key={m.id} to="/app/morcellement" search={{ measurement: m.id }}
               className="block bg-card rounded-xl p-4 shadow-card hover:shadow-elevated transition-shadow">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0 flex gap-3 flex-1">

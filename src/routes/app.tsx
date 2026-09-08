@@ -17,7 +17,9 @@ const NAV: { to: string; label: string; short: string; icon: string; admin?: boo
   
   { to: "/app/traitement", label: "Traitement & morcellement", short: "Traiter", icon: "tree" },
   { to: "/app/morcellement", label: "Morcellement", short: "Morceler", icon: "grid" },
+  { to: "/app/terrain", label: "Vue terrain", short: "Terrain", icon: "map" },
   { to: "/app/hierarchie", label: "Hiérarchie", short: "Hiérarchie", icon: "tree" },
+  { to: "/app/stats", label: "Suivi quotidien", short: "Suivi", icon: "grid", admin: true },
   { to: "/app/assistant", label: "Assistant IA", short: "IA", icon: "sparkle" },
   { to: "/app/releves", label: "Relevés (historique)", short: "Relevés", icon: "check", admin: true },
   { to: "/app/validation", label: "Validation", short: "Valider", icon: "check", admin: true },
