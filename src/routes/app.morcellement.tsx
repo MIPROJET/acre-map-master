@@ -14,6 +14,10 @@ import {
 } from "@/lib/morcellement-v11";
 
 export const Route = createFileRoute("/app/morcellement")({
+  validateSearch: (s: Record<string, unknown>): { parcelle?: string; measurement?: string } => ({
+    parcelle: typeof s['parcelle'] === "string" ? s['parcelle'] : undefined,
+    measurement: typeof s['measurement'] === "string" ? s['measurement'] : undefined,
+  }),
   component: MorcellementPage,
   head: () => ({
     meta: [
