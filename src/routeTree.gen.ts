@@ -17,6 +17,8 @@ import { Route as AppIndexRouteImport } from './routes/app.index'
 import { Route as AppValidationRouteImport } from './routes/app.validation'
 import { Route as AppUsersRouteImport } from './routes/app.users'
 import { Route as AppTraitementRouteImport } from './routes/app.traitement'
+import { Route as AppTerrainRouteImport } from './routes/app.terrain'
+import { Route as AppStatsRouteImport } from './routes/app.stats'
 import { Route as AppRelevesRouteImport } from './routes/app.releves'
 import { Route as AppMorcellementRouteImport } from './routes/app.morcellement'
 import { Route as AppMeasureRouteImport } from './routes/app.measure'
@@ -71,6 +73,16 @@ const AppUsersRoute = AppUsersRouteImport.update({
 const AppTraitementRoute = AppTraitementRouteImport.update({
   id: '/traitement',
   path: '/traitement',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppTerrainRoute = AppTerrainRouteImport.update({
+  id: '/terrain',
+  path: '/terrain',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppStatsRoute = AppStatsRouteImport.update({
+  id: '/stats',
+  path: '/stats',
   getParentRoute: () => AppRoute,
 } as any)
 const AppRelevesRoute = AppRelevesRouteImport.update({
@@ -167,6 +179,8 @@ export interface FileRoutesByFullPath {
   '/app/measure': typeof AppMeasureRoute
   '/app/morcellement': typeof AppMorcellementRoute
   '/app/releves': typeof AppRelevesRoute
+  '/app/stats': typeof AppStatsRoute
+  '/app/terrain': typeof AppTerrainRoute
   '/app/traitement': typeof AppTraitementRoute
   '/app/users': typeof AppUsersRoute
   '/app/validation': typeof AppValidationRoute
@@ -191,6 +205,8 @@ export interface FileRoutesByTo {
   '/app/measure': typeof AppMeasureRoute
   '/app/morcellement': typeof AppMorcellementRoute
   '/app/releves': typeof AppRelevesRoute
+  '/app/stats': typeof AppStatsRoute
+  '/app/terrain': typeof AppTerrainRoute
   '/app/traitement': typeof AppTraitementRoute
   '/app/users': typeof AppUsersRoute
   '/app/validation': typeof AppValidationRoute
@@ -217,6 +233,8 @@ export interface FileRoutesById {
   '/app/measure': typeof AppMeasureRoute
   '/app/morcellement': typeof AppMorcellementRoute
   '/app/releves': typeof AppRelevesRoute
+  '/app/stats': typeof AppStatsRoute
+  '/app/terrain': typeof AppTerrainRoute
   '/app/traitement': typeof AppTraitementRoute
   '/app/users': typeof AppUsersRoute
   '/app/validation': typeof AppValidationRoute
@@ -244,6 +262,8 @@ export interface FileRouteTypes {
     | '/app/measure'
     | '/app/morcellement'
     | '/app/releves'
+    | '/app/stats'
+    | '/app/terrain'
     | '/app/traitement'
     | '/app/users'
     | '/app/validation'
@@ -268,6 +288,8 @@ export interface FileRouteTypes {
     | '/app/measure'
     | '/app/morcellement'
     | '/app/releves'
+    | '/app/stats'
+    | '/app/terrain'
     | '/app/traitement'
     | '/app/users'
     | '/app/validation'
@@ -293,6 +315,8 @@ export interface FileRouteTypes {
     | '/app/measure'
     | '/app/morcellement'
     | '/app/releves'
+    | '/app/stats'
+    | '/app/terrain'
     | '/app/traitement'
     | '/app/users'
     | '/app/validation'
@@ -371,6 +395,20 @@ declare module '@tanstack/react-router' {
       path: '/traitement'
       fullPath: '/app/traitement'
       preLoaderRoute: typeof AppTraitementRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/terrain': {
+      id: '/app/terrain'
+      path: '/terrain'
+      fullPath: '/app/terrain'
+      preLoaderRoute: typeof AppTerrainRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/stats': {
+      id: '/app/stats'
+      path: '/stats'
+      fullPath: '/app/stats'
+      preLoaderRoute: typeof AppStatsRouteImport
       parentRoute: typeof AppRoute
     }
     '/app/releves': {
@@ -490,6 +528,8 @@ interface AppRouteChildren {
   AppMeasureRoute: typeof AppMeasureRoute
   AppMorcellementRoute: typeof AppMorcellementRoute
   AppRelevesRoute: typeof AppRelevesRoute
+  AppStatsRoute: typeof AppStatsRoute
+  AppTerrainRoute: typeof AppTerrainRoute
   AppTraitementRoute: typeof AppTraitementRoute
   AppUsersRoute: typeof AppUsersRoute
   AppValidationRoute: typeof AppValidationRoute
@@ -508,6 +548,8 @@ const AppRouteChildren: AppRouteChildren = {
   AppMeasureRoute: AppMeasureRoute,
   AppMorcellementRoute: AppMorcellementRoute,
   AppRelevesRoute: AppRelevesRoute,
+  AppStatsRoute: AppStatsRoute,
+  AppTerrainRoute: AppTerrainRoute,
   AppTraitementRoute: AppTraitementRoute,
   AppUsersRoute: AppUsersRoute,
   AppValidationRoute: AppValidationRoute,
