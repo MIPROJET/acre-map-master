@@ -1,103 +1,27 @@
 /**
- * AcreMap — Moteur de morcellement réel.
+ * AcreMap — Moteur de morcellement professionnel.
  *
- * Calcule une géométrie exploitable à partir du périmètre GPS réellement levé :
- * voie principale, voies secondaires, réserve familiale, points de collecte,
- * lots de superficie cible et reliquats. Toutes les surfaces sont mesurées en m²
- * sur l'ellipsoïde (turf), puis les polygones sont normalisés dans un repère
- * 0..100 pour l'aperçu vectoriel.
+ * Chaîne de conception foncière :
+ *   PARCELLE → PARTAGE → STRUCTURE VIAIRE → ÎLOTS → LOTS → OPTIMISATION → CONTRÔLE
+ *
+ * Aucune génération en bandes parallèles : la voirie est tracée à partir de
+ * l'analyse de forme de la parcelle (axe principal, dimensions, accès), les
+ * îlots naissent du réseau viaire, et les lots sont découpés à l'intérieur de
+ * chaque îlot selon son orientation propre, avec la superficie cible comme
+ * contrainte prioritaire (tolérance ±100 m²).
  */
-import * as turf from "@turf/turf";
-import type { Feature, Polygon, MultiPolygon } from "geojson";
-import { polygonAreaM2 } from "./gps";
+import { polygonAreaM2, polygonPerimeterM } from "./gps";
 import type { Axis, Pt } from "./partage";
 import {
+  areaOf, convexHullXY, corridor, cutByArea, differenceSafe, extentAlong, featureOf,
+  intersectSafe, makeProjector, orientedBox, pieces, unionAll,
+  type AnyPoly, type Projector, type XY,
+} from "./geo/planar";
+import {
   TOLERANCE_M2,
-  type MorcConfig,
-  type PlanLot,
-  type PlanResult,
-  type PlanScore,
-  type PlanVoie,
+  type MorcConfig, type PlanAnalyse, type PlanIlot, type PlanLot, type PlanResult,
+  type PlanScore, type PlanVoie, type PlanZone,
 } from "./morcellement-v11";
-
-type AnyPoly = Feature<Polygon | MultiPolygon>;
-
-/* ------------------------------- helpers turf ------------------------------- */
-
-function ringFromPts(pts: Pt[]): number[][] {
-  return [...pts, pts[0]].map((p) => [p.lng, p.lat]);
-}
-function ptsFromCoords(coords: number[][]): Pt[] {
-  const arr = coords.map(([lng, lat]) => ({ lng, lat }));
-  if (arr.length > 1 && arr[0].lat === arr.at(-1)!.lat && arr[0].lng === arr.at(-1)!.lng) arr.pop();
-  return arr;
-}
-function extractPolys(f: AnyPoly | null): Pt[][] {
-  if (!f) return [];
-  const g = f.geometry;
-  if (g.type === "Polygon") return [ptsFromCoords(g.coordinates[0])];
-  return g.coordinates.map((c) => ptsFromCoords(c[0]));
-}
-function featureOf(pts: Pt[]): Feature<Polygon> {
-  return turf.polygon([ringFromPts(pts)]) as Feature<Polygon>;
-}
-function areaOf(f: AnyPoly | null): number {
-  if (!f) return 0;
-  try { return turf.area(f); } catch { return 0; }
-}
-function intersectSafe(a: AnyPoly, b: AnyPoly): AnyPoly | null {
-  try { return turf.intersect(turf.featureCollection([a, b])) as AnyPoly | null; } catch { return null; }
-}
-function differenceSafe(a: AnyPoly, b: AnyPoly): AnyPoly | null {
-  try { return turf.difference(turf.featureCollection([a, b])) as AnyPoly | null; } catch { return null; }
-}
-function boxAlong(bbox: number[], axis: Axis, from: number, to: number): Feature<Polygon> {
-  const [minX, minY, maxX, maxY] = bbox;
-  return axis === "horizontal"
-    ? turf.polygon([[[minX - 1, from], [maxX + 1, from], [maxX + 1, to], [minX - 1, to], [minX - 1, from]]])
-    : turf.polygon([[[from, minY - 1], [to, minY - 1], [to, maxY + 1], [from, maxY + 1], [from, minY - 1]]]);
-}
-
-/** Découpe une tranche de `targetM2` depuis le début de l'axe. */
-function sliceByArea(poly: AnyPoly, axis: Axis, targetM2: number): { cut: AnyPoly | null; rest: AnyPoly | null; area: number } {
-  const bbox = turf.bbox(poly);
-  const [minX, minY, maxX, maxY] = bbox;
-  let lo = axis === "horizontal" ? minY : minX;
-  let hi = axis === "horizontal" ? maxY : maxX;
-  let best: AnyPoly | null = null;
-  let bestArea = 0;
-  for (let i = 0; i < 60; i++) {
-    const mid = (lo + hi) / 2;
-    const box = boxAlong(bbox, axis, axis === "horizontal" ? minY - 1 : minX - 1, mid);
-    const inter = intersectSafe(poly, box);
-    const a = areaOf(inter);
-    best = inter; bestArea = a;
-    if (Math.abs(a - targetM2) <= Math.max(0.5, targetM2 * 1e-6)) break;
-    if (a > targetM2) hi = mid; else lo = mid;
-  }
-  if (!best) return { cut: null, rest: poly, area: 0 };
-  return { cut: best, rest: differenceSafe(poly, best), area: bestArea };
-}
-
-/** Bande de largeur `widthM` positionnée à `frac` (0..1) le long de l'axe. */
-function bandAt(poly: AnyPoly, axis: Axis, frac: number, widthM: number): { band: AnyPoly | null; rest: AnyPoly | null } {
-  const bbox = turf.bbox(poly);
-  const [minX, minY, maxX, maxY] = bbox;
-  const cy = (minY + maxY) / 2;
-  const cosLat = Math.max(0.1, Math.cos((cy * Math.PI) / 180));
-  const half = axis === "horizontal"
-    ? widthM / 2 / 110_540
-    : widthM / 2 / (111_320 * cosLat);
-  const center = axis === "horizontal" ? minY + (maxY - minY) * frac : minX + (maxX - minX) * frac;
-  const box = boxAlong(bbox, axis, center - half, center + half);
-  const band = intersectSafe(poly, box);
-  const rest = band ? differenceSafe(poly, band) : poly;
-  return { band, rest };
-}
-
-function splitPieces(f: AnyPoly | null): Pt[][] {
-  return extractPolys(f).filter((p) => p.length >= 3 && polygonAreaM2(p) > 20);
-}
 
 /* ------------------------------ normalisation ------------------------------ */
 
@@ -122,195 +46,384 @@ function makeNormalizer(perimeter: Pt[]): Norm {
   ] as [number, number]);
 }
 
-/* --------------------------------- moteur --------------------------------- */
+/* -------------------------------- analyse ---------------------------------- */
 
-function resolveAxis(cfg: MorcConfig, perimeter: Pt[]): Axis {
-  if (cfg.orientation === "verticale") return "vertical";
-  if (cfg.orientation === "horizontale") return "horizontal";
-  const lats = perimeter.map((p) => p.lat);
-  const lngs = perimeter.map((p) => p.lng);
-  const midLat = (Math.min(...lats) + Math.max(...lats)) / 2;
-  const wM = (Math.max(...lngs) - Math.min(...lngs)) * 111_320 * Math.cos((midLat * Math.PI) / 180);
-  const hM = (Math.max(...lats) - Math.min(...lats)) * 110_540;
-  // On empile les bandes dans le sens le plus long pour limiter les lots étroits.
-  return hM >= wM ? "horizontal" : "vertical";
+const ILOT_LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+const azimutOf = (theta: number) => ((90 - (theta * 180) / Math.PI) % 360 + 360) % 360;
+
+function describeForme(elongation: number, convexite: number): string {
+  if (convexite < 0.82) return elongation > 2.2 ? "allongée et découpée" : "irrégulière avec concavités";
+  if (elongation > 3) return "très allongée";
+  if (elongation > 1.8) return "allongée";
+  if (elongation > 1.25) return "rectangulaire";
+  return "compacte";
 }
 
-const perpendicular = (a: Axis): Axis => (a === "horizontal" ? "vertical" : "horizontal");
+/** Point d'accès présumé : milieu du plus long côté du périmètre. */
+function accesPoint(perimeter: Pt[], proj: Projector): Pt {
+  let best = perimeter[0], bestLen = -1;
+  for (let i = 0; i < perimeter.length; i++) {
+    const a = perimeter[i], b = perimeter[(i + 1) % perimeter.length];
+    const pa = proj.toXY(a), pb = proj.toXY(b);
+    const len = Math.hypot(pb.x - pa.x, pb.y - pa.y);
+    if (len > bestLen) {
+      bestLen = len;
+      best = proj.toLL({ x: (pa.x + pb.x) / 2, y: (pa.y + pb.y) / 2 });
+    }
+  }
+  return best;
+}
+
+function analyser(perimeter: Pt[], proj: Projector): { analyse: PlanAnalyse; box: ReturnType<typeof orientedBox> } {
+  const xy = perimeter.map(proj.toXY);
+  const box = orientedBox(xy);
+  const areaM2 = polygonAreaM2(perimeter);
+  const perimetreM = polygonPerimeterM(perimeter);
+  const hull = convexHullXY(xy);
+  const hullArea = Math.abs(hull.reduce((s, p, i) => {
+    const q = hull[(i + 1) % hull.length];
+    return s + (p.x * q.y - q.x * p.y);
+  }, 0)) / 2;
+  const convexite = hullArea > 0 ? Math.min(1, areaM2 / hullArea) : 1;
+  const elongation = box.largeurM > 0 ? box.longueurM / box.largeurM : 1;
+  const compacite = perimetreM > 0 ? (4 * Math.PI * areaM2) / (perimetreM * perimetreM) : 0;
+  return {
+    box,
+    analyse: {
+      areaM2: Math.round(areaM2),
+      perimetreM: Math.round(perimetreM),
+      longueurM: Math.round(box.longueurM),
+      largeurM: Math.round(box.largeurM),
+      azimutDeg: Math.round(azimutOf(box.theta)),
+      elongation: Number(elongation.toFixed(2)),
+      convexite: Number(convexite.toFixed(2)),
+      compacite: Number(compacite.toFixed(2)),
+      acces: accesPoint(perimeter, proj),
+      forme: describeForme(elongation, convexite),
+    },
+  };
+}
+
+/* --------------------------------- moteur ---------------------------------- */
 
 function bornesFor(code: string, poly: Pt[]) {
   return poly.map((p, i) => ({ label: `${code}-B${i + 1}`, lat: p.lat, lng: p.lng }));
 }
+
+const centroidXY = (poly: Pt[], proj: Projector): XY => {
+  const pts = poly.map(proj.toXY);
+  return {
+    x: pts.reduce((s, p) => s + p.x, 0) / pts.length,
+    y: pts.reduce((s, p) => s + p.y, 0) / pts.length,
+  };
+};
 
 export interface EngineInput {
   perimeter: Pt[];
   config: MorcConfig;
 }
 
-/** Construit un plan réel à partir d'un périmètre GPS levé. */
+/** Construit un plan foncier complet à partir d'un périmètre GPS levé. */
 export function buildPlan({ perimeter, config: cfg }: EngineInput): PlanResult {
+  const proj = makeProjector(perimeter);
   const norm = makeNormalizer(perimeter);
+  const { analyse, box } = analyser(perimeter, proj);
   const totalM2 = polygonAreaM2(perimeter);
   const cibleM2 = Math.max(100, Math.round(cfg.cibleHa * 10_000));
-  const axis = resolveAxis(cfg, perimeter);
+  const span = Math.max(box.longueurM, box.largeurM) * 4 + 500;
+  const parcelF = featureOf(perimeter);
 
-  const lots: PlanLot[] = [];
+  /* ---- 1. PARTAGE AgriCapital / Propriétaire (avant tout découpage) ------- */
+
+  // La ligne de séparation est perpendiculaire au grand axe : c'est la coupe la
+  // plus courte et la plus naturelle pour la géométrie relevée.
+  const thetaPartage = box.theta;
+  let partAcGeo: Pt[][] = [];
+  let partProprioGeo: Pt[][] = [];
+  let areaACm2 = 0;
+  let areaProprioM2 = 0;
+  const pctAC = Math.min(100, Math.max(0, cfg.partAcPct));
+
+  if (cfg.partageActif && pctAC > 0 && pctAC < 100) {
+    const { basse, haute } = cutByArea(proj, parcelF, perimeter, thetaPartage, (totalM2 * pctAC) / 100, span);
+    partAcGeo = pieces(basse, 50);
+    partProprioGeo = pieces(haute, 50);
+    areaACm2 = partAcGeo.reduce((s, p) => s + polygonAreaM2(p), 0);
+    areaProprioM2 = partProprioGeo.reduce((s, p) => s + polygonAreaM2(p), 0);
+  }
+
+  const partageActif = cfg.partageActif && partAcGeo.length > 0 && partProprioGeo.length > 0;
+  const cible = partageActif ? cfg.cibleMorcellement : "global";
+
+  const zoneMorcelableF: AnyPoly | null =
+    !partageActif || cible === "global" ? parcelF
+      : cible === "ac" ? unionAll(partAcGeo)
+        : unionAll(partProprioGeo);
+
+  /* ---- 2. STRUCTURE VIAIRE (traverse toute la parcelle) ------------------- */
+
+  const thetaVoie =
+    cfg.orientationVoie === "horizontale" ? 0
+      : cfg.orientationVoie === "verticale" ? Math.PI / 2
+        : box.theta;                        // auto / terrain : suit le grand axe
+  const thetaSec =
+    cfg.orientationVoieSec === "horizontale" ? 0
+      : cfg.orientationVoieSec === "verticale" ? Math.PI / 2
+        : thetaVoie + Math.PI / 2;          // auto / adaptative : perpendiculaire
+
   const voies: PlanVoie[] = [];
-  let working: AnyPoly | null = featureOf(perimeter);
+  const corridors: AnyPoly[] = [];
 
-  // --- Voie principale ---------------------------------------------------
-  if (cfg.voiePrincipale && working) {
-    const voieAxis: Axis = cfg.orientationVoie === "verticale" ? "vertical"
-      : cfg.orientationVoie === "horizontale" ? "horizontal"
-      : perpendicular(axis);
-    const frac = cfg.positionVoie === "laterale" ? 0.15 : cfg.positionVoie === "centrale" ? 0.5 : 0.35;
-    const { band, rest } = bandAt(working, voieAxis, frac, cfg.largeurVoieM);
-    for (const p of splitPieces(band)) {
-      voies.push({ kind: "principale", largeurM: cfg.largeurVoieM, poly: norm(p), geo: p });
-    }
-    if (rest) working = rest;
-  }
-
-  // --- Voies secondaires --------------------------------------------------
-  if (cfg.voiesSecondaires && cfg.nbVoiesSec > 0 && working) {
-    const secAxis: Axis = cfg.orientationVoieSec === "verticale" ? "vertical"
-      : cfg.orientationVoieSec === "horizontale" ? "horizontal"
-      : axis;
-    for (let i = 1; i <= cfg.nbVoiesSec; i++) {
-      if (!working) break;
-      const frac = i / (cfg.nbVoiesSec + 1);
-      const { band, rest } = bandAt(working, secAxis, frac, cfg.largeurVoieSecM);
-      for (const p of splitPieces(band)) {
-        voies.push({ kind: "secondaire", largeurM: cfg.largeurVoieSecM, poly: norm(p), geo: p });
-      }
-      if (rest) working = rest;
-    }
-  }
-
-  // --- Réserve familiale --------------------------------------------------
-  if (cfg.reserveActive && cfg.reserveM2 > 0 && working) {
-    const { cut, rest } = sliceByArea(working, axis, Math.min(cfg.reserveM2, areaOf(working) * 0.5));
-    const pieces = splitPieces(cut).sort((a, b) => polygonAreaM2(b) - polygonAreaM2(a));
-    if (pieces[0]) {
-      const g = pieces[0];
-      const a = polygonAreaM2(g);
-      lots.push({
-        code: "RES", part: "proprietaire", kind: "reserve",
-        poly: norm(g), geo: g, bornes: bornesFor("RES", g),
-        cibleM2: cfg.reserveM2, reelM2: Math.round(a), conforme: true,
-        label: `RÉSERVE ${cfg.familleNom.toUpperCase()} — ${(a / 10000).toLocaleString("fr-FR", { maximumFractionDigits: 2 })} ha`,
-      });
-    }
-    if (rest) working = rest;
-  }
-
-  // --- Points de collecte -------------------------------------------------
-  if (cfg.collecteActive && working) {
-    cfg.collecte.slice(0, cfg.nbCollecte).forEach((pc) => {
-      if (!working) return;
-      const { cut, rest } = sliceByArea(working, perpendicular(axis), Math.min(pc.areaM2, areaOf(working) * 0.2));
-      const pieces = splitPieces(cut).sort((a, b) => polygonAreaM2(b) - polygonAreaM2(a));
-      if (pieces[0]) {
-        const g = pieces[0];
-        const a = polygonAreaM2(g);
-        lots.push({
-          code: pc.id, part: "ac", kind: "collecte",
-          poly: norm(g), geo: g, bornes: bornesFor(pc.id, g),
-          cibleM2: pc.areaM2, reelM2: Math.round(a), conforme: true,
-          label: `${pc.type === "principal" ? "PC PRINCIPAL" : "PC SECONDAIRE"} — ${Math.round(a).toLocaleString("fr-FR")} m²`,
+  // Voie principale : épine dorsale reliant l'accès au cœur de la parcelle.
+  if (cfg.voiePrincipale) {
+    const lateralPct = cfg.modeVoie === "manuel"
+      ? Math.max(-45, Math.min(45, cfg.decalageVoiePct)) / 100
+      : cfg.positionVoie === "laterale" ? -0.3
+        : cfg.positionVoie === "traversante" ? 0.12
+          : 0;                              // auto / centrale
+    // Décalage perpendiculaire à la voie, exprimé en fraction de la largeur.
+    const vx = -Math.sin(thetaVoie), vy = Math.cos(thetaVoie);
+    const dep = box.largeurM * lateralPct;
+    const centre: XY = { x: box.centre.x + vx * dep, y: box.centre.y + vy * dep };
+    const band = corridor(proj, centre, thetaVoie, cfg.largeurVoieM, span);
+    const clipped = intersectSafe(parcelF, band);
+    if (clipped) {
+      corridors.push(clipped);
+      for (const p of pieces(clipped, 5)) {
+        voies.push({
+          kind: "principale", largeurM: cfg.largeurVoieM, poly: norm(p), geo: p,
+          longueurM: Math.round(polygonAreaM2(p) / Math.max(1, cfg.largeurVoieM)),
         });
       }
-      if (rest) working = rest;
-    });
+    }
   }
 
-  // --- Lots de superficie cible ------------------------------------------
-  const utiles: PlanLot[] = [];
-  const blocs = splitPieces(working).sort((a, b) => polygonAreaM2(b) - polygonAreaM2(a));
-  const residuels: Pt[][] = [];
+  // Voies secondaires : ramifications desservant les îlots depuis l'épine.
+  if (cfg.voiesSecondaires) {
+    // Profondeur d'îlot visée : deux rangées de lots de part et d'autre.
+    const cote = Math.sqrt(cibleM2);
+    const auto = Math.round(box.longueurM / Math.max(60, cote * 2.2)) - 1;
+    const nb = cfg.modeVoieSec === "manuel"
+      ? Math.max(0, Math.min(20, Math.round(cfg.nbVoiesSec)))
+      : Math.max(0, Math.min(14, auto));
+    const ux = Math.cos(thetaVoie), uy = Math.sin(thetaVoie);
+    for (let i = 1; i <= nb; i++) {
+      const t = -box.longueurM / 2 + (i * box.longueurM) / (nb + 1);
+      const centre: XY = { x: box.centre.x + ux * t, y: box.centre.y + uy * t };
+      const band = corridor(proj, centre, thetaSec, cfg.largeurVoieSecM, span);
+      const clipped = intersectSafe(parcelF, band);
+      if (!clipped) continue;
+      corridors.push(clipped);
+      for (const p of pieces(clipped, 5)) {
+        voies.push({
+          kind: "secondaire", largeurM: cfg.largeurVoieSecM, poly: norm(p), geo: p,
+          longueurM: Math.round(polygonAreaM2(p) / Math.max(1, cfg.largeurVoieSecM)),
+        });
+      }
+    }
+  }
 
-  for (const bloc of blocs) {
-    let rem: AnyPoly | null = featureOf(bloc);
+  const voirieF = unionAll(corridors.flatMap((c) => pieces(c, 1)));
+  const voirieM2 = voies.reduce((s, v) => s + (v.geo ? polygonAreaM2(v.geo) : 0), 0);
+
+  /* ---- 3. ÎLOTS : ce que la voirie découpe dans la zone à morceler -------- */
+
+  let terrainF: AnyPoly | null = zoneMorcelableF;
+  if (terrainF && voirieF) terrainF = differenceSafe(terrainF, voirieF);
+
+  const minIlot = Math.max(150, cibleM2 * 0.08);
+  const blocs = pieces(terrainF, minIlot)
+    .map((geo) => ({ geo, d: (() => { const c = centroidXY(geo, proj); return c.x * Math.cos(thetaVoie) + c.y * Math.sin(thetaVoie); })() }))
+    .sort((a, b) => a.d - b.d)
+    .map((x) => x.geo);
+
+  /* ---- 4. LOTS : découpe interne à chaque îlot ---------------------------- */
+
+  const lots: PlanLot[] = [];
+  const ilots: PlanIlot[] = [];
+  const reliquats: Pt[][] = [];
+  const utiles: PlanLot[] = [];
+
+  // Points de collecte : prélevés en bordure de la voie principale.
+  const collectes = cfg.collecteActive ? cfg.collecte.slice(0, cfg.nbCollecte) : [];
+  let collecteIdx = 0;
+
+  blocs.forEach((bloc, bi) => {
+    const lettre = ILOT_LETTERS[bi % ILOT_LETTERS.length];
+    let rest: AnyPoly | null = featureOf(bloc);
+
+    // Un point de collecte par îlot desservi, tant qu'il en reste à placer.
+    while (collecteIdx < collectes.length && rest && areaOf(rest) > collectes[collecteIdx].areaM2 * 3) {
+      const pc = collectes[collecteIdx];
+      const restPts = pieces(rest, 10)[0];
+      if (!restPts) break;
+      const bb = orientedBox(restPts.map(proj.toXY));
+      const { basse, haute } = cutByArea(proj, rest, restPts, bb.theta, pc.areaM2, span);
+      const g = pieces(basse, 10).sort((a, b) => polygonAreaM2(b) - polygonAreaM2(a))[0];
+      if (!g) break;
+      const a = Math.round(polygonAreaM2(g));
+      lots.push({
+        code: pc.id, part: cible === "proprietaire" ? "proprietaire" : "ac", kind: "collecte",
+        poly: norm(g), geo: g, bornes: bornesFor(pc.id, g), ilot: lettre,
+        cibleM2: pc.areaM2, reelM2: a, conforme: Math.abs(a - pc.areaM2) <= TOLERANCE_M2,
+        label: `${pc.type === "principal" ? "PC PRINCIPAL" : "PC SECONDAIRE"} — ${a.toLocaleString("fr-FR")} m²`,
+      });
+      rest = haute;
+      collecteIdx++;
+      break;
+    }
+
+    const ilotGeo = pieces(rest, 10).sort((a, b) => polygonAreaM2(b) - polygonAreaM2(a))[0] ?? bloc;
+    const ilotArea = polygonAreaM2(ilotGeo);
+    let nbLotsIlot = 0;
+
+    // Chaque îlot est découpé selon SON orientation propre : les lots épousent
+    // les limites et les voies, ce qui évite l'effet de bandes uniformes.
+    let rem: AnyPoly | null = featureOf(ilotGeo);
     let guard = 0;
-    while (rem && guard < 400) {
+    while (rem && guard < 300) {
       guard++;
-      const remArea = areaOf(rem);
-      if (remArea < cibleM2 + 1) break;
-      const { cut, rest, area } = sliceByArea(rem, axis, cibleM2);
-      const pieces = splitPieces(cut).sort((a, b) => polygonAreaM2(b) - polygonAreaM2(a));
-      if (!pieces[0]) break;
-      const g = pieces[0];
+      const remPts = pieces(rem, 10).sort((a, b) => polygonAreaM2(b) - polygonAreaM2(a))[0];
+      if (!remPts) break;
+      const remArea = polygonAreaM2(remPts);
+      if (remArea < cibleM2 + TOLERANCE_M2) break;
+      const bb = orientedBox(remPts.map(proj.toXY));
+      const remF = featureOf(remPts);
+      const { basse, haute, aire } = cutByArea(proj, remF, remPts, bb.theta, cibleM2, span);
+      const parts = pieces(basse, 10).sort((a, b) => polygonAreaM2(b) - polygonAreaM2(a));
+      const g = parts[0];
+      if (!g) break;
       const reel = Math.round(polygonAreaM2(g));
-      const code = `H${String(utiles.length + 1).padStart(2, "0")}`;
+      nbLotsIlot++;
+      const code = `${lettre}${String(nbLotsIlot).padStart(2, "0")}`;
       utiles.push({
-        code, part: "proprietaire", kind: "lot",
+        code,
+        part: cible === "ac" ? "ac" : cible === "proprietaire" ? "proprietaire" : "proprietaire",
+        kind: "lot", ilot: lettre,
         poly: norm(g), geo: g, bornes: bornesFor(code, g),
         cibleM2, reelM2: reel,
         conforme: Math.abs(reel - cibleM2) <= TOLERANCE_M2,
       });
-      // Les morceaux détachés par un découpage concave rejoignent les résiduels.
-      pieces.slice(1).forEach((p) => residuels.push(p));
-      if (Math.abs(area - cibleM2) > cibleM2 * 0.5) break;
-      rem = rest;
+      // Morceaux détachés par une concavité : ils rejoignent les reliquats.
+      parts.slice(1).forEach((p) => reliquats.push(p));
+      // Autres blocs du reste (îlot en plusieurs morceaux) : traités comme reliquats.
+      pieces(rem, 10).slice(1).forEach((p) => reliquats.push(p));
+      if (Math.abs(aire - cibleM2) > cibleM2 * 0.5) break;
+      rem = haute;
     }
-    splitPieces(rem).forEach((p) => residuels.push(p));
-  }
+    pieces(rem, Math.max(120, cibleM2 * 0.03)).forEach((p) => reliquats.push(p));
 
-  // --- Partage AC / Propriétaire -----------------------------------------
-  if (cfg.partageActif && utiles.length) {
-    const nbAc = Math.round((utiles.length * cfg.partAcPct) / 100);
-    const ordered = cfg.organisationPartage === "blocs"
-      ? utiles
-      : [...utiles].sort((a, b) => a.code.localeCompare(b.code));
-    ordered.forEach((l, i) => { l.part = i < nbAc ? "ac" : "proprietaire"; });
+    ilots.push({
+      code: lettre, poly: norm(ilotGeo), geo: ilotGeo,
+      areaM2: Math.round(ilotArea),
+      part: cible === "ac" ? "ac" : cible === "proprietaire" ? "proprietaire" : "proprietaire",
+      nbLots: nbLotsIlot,
+    });
+  });
+
+  /* ---- 5. Répartition AC / Propriétaire des lots (morcellement global) ---- */
+
+  if (partageActif && cible === "global") {
+    const { min } = extentAlong(proj, perimeter, thetaPartage);
+    const { max } = extentAlong(proj, perimeter, thetaPartage);
+    const seuil = min + (max - min) * (pctAC / 100);
+    utiles.forEach((l) => {
+      const c = centroidXY(l.geo ?? [], proj);
+      const d = c.x * Math.cos(thetaPartage) + c.y * Math.sin(thetaPartage);
+      l.part = d <= seuil ? "ac" : "proprietaire";
+    });
+  } else if (partageActif) {
+    utiles.forEach((l) => { l.part = cible === "ac" ? "ac" : "proprietaire"; });
   }
 
   lots.push(...utiles);
+  ilots.forEach((i) => {
+    const parts = utiles.filter((l) => l.ilot === i.code);
+    if (parts.length) i.part = parts.filter((l) => l.part === "ac").length >= parts.length / 2 ? "ac" : "proprietaire";
+  });
 
-  // --- Reliquats ----------------------------------------------------------
-  residuels
-    .filter((p) => polygonAreaM2(p) > Math.max(200, cibleM2 * 0.02))
-    .sort((a, b) => polygonAreaM2(b) - polygonAreaM2(a))
-    .forEach((p, i) => {
-      const code = `R${String(i + 1).padStart(2, "0")}`;
-      const a = Math.round(polygonAreaM2(p));
-      lots.push({
-        code, part: "proprietaire", kind: "reserve",
-        poly: norm(p), geo: p, bornes: bornesFor(code, p),
-        cibleM2: a, reelM2: a, conforme: true,
-        label: `RELIQUAT ${code} — ${a.toLocaleString("fr-FR")} m²`,
-      });
+  /* ---- 6. Reliquats identifiés ------------------------------------------- */
+
+  const seuilReliquat = Math.max(150, cibleM2 * 0.03);
+  const reliquatsRetenus = reliquats
+    .filter((p) => polygonAreaM2(p) > seuilReliquat)
+    .sort((a, b) => polygonAreaM2(b) - polygonAreaM2(a));
+  reliquatsRetenus.forEach((p, i) => {
+    const code = `R${String(i + 1).padStart(2, "0")}`;
+    const a = Math.round(polygonAreaM2(p));
+    lots.push({
+      code, part: cible === "ac" ? "ac" : "proprietaire", kind: "reserve",
+      poly: norm(p), geo: p, bornes: bornesFor(code, p),
+      cibleM2: a, reelM2: a, conforme: true,
+      label: `RELIQUAT ${code} — ${a.toLocaleString("fr-FR")} m²`,
     });
+  });
+  const reliquatM2 = reliquatsRetenus.reduce((s, p) => s + polygonAreaM2(p), 0);
 
-  // --- Scores -------------------------------------------------------------
+  /* ---- 7. Zones non morcelées -------------------------------------------- */
+
+  const zones: PlanZone[] = [];
+  const proprio = (cfg.proprietaireNom || "PROPRIÉTAIRE").toUpperCase();
+  if (partageActif && cible !== "global") {
+    const gardees = cible === "ac" ? partProprioGeo : partAcGeo;
+    const part: "ac" | "proprietaire" = cible === "ac" ? "proprietaire" : "ac";
+    for (const g of gardees) {
+      // La voirie traverse la zone non morcelée mais n'y crée aucun lot.
+      zones.push({
+        part,
+        poly: norm(g), geo: g,
+        areaM2: Math.round(polygonAreaM2(g)),
+        titre: part === "proprietaire" ? proprio : "AGRICAPITAL",
+        mention: part === "proprietaire" ? "RÉSERVE PROPRIÉTAIRE" : "PART AGRICAPITAL",
+      });
+    }
+  }
+
+  /* ---- 8. Contrôle de conformité et scores -------------------------------- */
+
   const nonConformes = utiles.filter((l) => !l.conforme).length;
-  const residuelM2 = residuels.reduce((s, p) => s + polygonAreaM2(p), 0);
-  const superficies = utiles.length
-    ? Math.round(100 - (nonConformes / utiles.length) * 100)
-    : 0;
+  const morceleM2 = utiles.reduce((s, l) => s + l.reelM2, 0);
+  const desservis = utiles.length; // chaque lot naît d'un îlot bordé par la voirie
+  const superficies = utiles.length ? Math.round(100 - (nonConformes / utiles.length) * 100) : 0;
   const score: PlanScore = {
     superficies,
-    accessibilite: cfg.voiePrincipale ? (cfg.voiesSecondaires ? 96 : 84) : 60,
-    formes: Math.round(100 - Math.min(40, (residuelM2 / Math.max(1, totalM2)) * 200)),
-    voies: voies.length ? Math.min(100, 70 + voies.length * 6) : 55,
-    residuels: Math.round(100 - Math.min(60, (residuelM2 / Math.max(1, totalM2)) * 100 * 2)),
+    accessibilite: voies.length
+      ? Math.min(100, 62 + (voies.some((v) => v.kind === "principale") ? 18 : 0)
+        + Math.min(20, voies.filter((v) => v.kind === "secondaire").length * 4))
+      : 45,
+    formes: Math.round(100 - Math.min(45, (reliquatM2 / Math.max(1, totalM2)) * 220)),
+    voies: voies.length ? Math.min(100, 68 + voies.length * 5) : 40,
+    residuels: Math.round(100 - Math.min(60, (reliquatM2 / Math.max(1, totalM2)) * 200)),
     global: 0,
   };
   score.global = Math.round(
     score.superficies * 0.35 + score.accessibilite * 0.2 + score.formes * 0.15 +
     score.voies * 0.15 + score.residuels * 0.15,
   );
+  void desservis;
+
+  const axis: Axis = Math.abs(Math.cos(box.theta)) >= Math.abs(Math.sin(box.theta)) ? "horizontal" : "vertical";
 
   return {
-    lots,
-    voies,
+    lots, voies, ilots, zones,
     parcelle: norm(perimeter),
     parcelleGeo: perimeter,
     axis,
+    analyse,
+    partage: {
+      actif: partageActif,
+      pctAC,
+      areaACm2: Math.round(areaACm2),
+      areaProprioM2: Math.round(areaProprioM2),
+      cible,
+    },
     score,
     conforme: nonConformes === 0 && utiles.length > 0,
     cibleM2,
     totalM2: Math.round(totalM2),
+    morceleM2: Math.round(morceleM2),
+    voirieM2: Math.round(voirieM2),
+    reliquatM2: Math.round(reliquatM2),
     createdAt: Date.now(),
   };
 }
